@@ -74,6 +74,12 @@ public class VisionDefectManager : MonoBehaviour
     /// <summary>
     /// Wygodna metoda typu On/Off pod przyciski UI: jeśli dana wada jest już aktywna, wyłącza ją; w przeciwnym razie włącza.
     /// </summary>
+
+   public void SetEffect(string type)
+    {
+        ToggleDefect(type);
+    }
+    
     public void ToggleDefect(string type, float initialIntensity = 1.0f)
     {
         if (CurrentDefect != null && CurrentDefect.DefectType == type && CurrentDefect.IsActive)
