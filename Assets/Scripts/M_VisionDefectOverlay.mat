@@ -1,0 +1,60 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: M_VisionDefectOverlay
+  m_Shader: {fileID: 4800000, guid: 72c9af3d84ba7be4ab0c2a496ed39fb8, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords: []
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _MainTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _MaskTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _NoiseTex:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _FrostGrain: 0.175
+    - _HazeUsage: 0.25
+    - _Intensity: 0.355
+    - _MaskScale: 1
+    - _MaskUsage: 0
+    - _ScotomaMaxRadius: 0.16
+    - _ScotomaSoftness: 0.146
+    - _ScotomaUsage: 0
+    - _VignetteMaxRadius: 0.7
+    - _VignetteMinRadius: 0.097
+    - _VignetteSoftness: 0.12
+    - _VignetteUsage: 0
+    m_Colors:
+    - _HazeColor: {r: 0.96, g: 0.91, b: 0.76, a: 0.82}
+    - _MaskColor: {r: 0.02, g: 0.02, b: 0.02, a: 0.85}
+    - _MaskOffset: {r: 0, g: 0, b: 0, a: 0}
+    - _ScotomaColor: {r: 0.049999982, g: 0.049999982, b: 0.049999982, a: 0.98}
+    - _VignetteCenter: {r: 0.5, g: 0.5, b: 0, a: 0}
+    - _VignetteColor: {r: 0.3018868, g: 0.3018868, b: 0.3018868, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1
