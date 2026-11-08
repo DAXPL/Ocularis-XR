@@ -55,63 +55,44 @@ Shader "Ocularis/Defects/Cataract"
                 float _CloudScale;
             CBUFFER_END
 
-            float Hash21(float2 p)
             // Losowy wektor jednostkowy 2D dla szumu gradientowego (Perlin-style) - brak kwadratowych bloków
             float2 Hash22Grad(float2 p)
             {
-                p = frac(p * float2(123.34, 456.21));
-                p += dot(p, p + 45.32);
-                return frac(p.x * p.y);
                 float3 p3 = frac(float3(p.xyx) * float3(0.1031, 0.1030, 0.0973));
                 p3 += dot(p3, p3.yzx + 33.33);
                 float2 h = frac((p3.xx + p3.yz) * p3.zy) * 6.2831853;
                 return float2(cos(h.x), sin(h.x));
             }
 
-            float ValueNoise(float2 p)
             // Gładki szum gradientowy C2 (interpolacja wielomianem 5. stopnia) bez widocznych przejść siatki
             float GradientNoise(float2 p)
             {
                 float2 i = floor(p);
                 float2 f = frac(p);
-                float2 u = f * f * (3.0 - 2.0 * f);
                 float2 u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
 
-                float a = Hash21(i);
-                float b = Hash21(i + float2(1.0, 0.0));
-                float c = Hash21(i + float2(0.0, 1.0));
-                float d = Hash21(i + float2(1.0, 1.0));
                 float n00 = dot(Hash22Grad(i + float2(0.0, 0.0)), f - float2(0.0, 0.0));
                 float n10 = dot(Hash22Grad(i + float2(1.0, 0.0)), f - float2(1.0, 0.0));
                 float n01 = dot(Hash22Grad(i + float2(0.0, 1.0)), f - float2(0.0, 1.0));
                 float n11 = dot(Hash22Grad(i + float2(1.0, 1.0)), f - float2(1.0, 1.0));
 
-                return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
                 return lerp(lerp(n00, n10, u.x), lerp(n01, n11, u.x), u.y) * 0.5 + 0.5;
             }
 
-            // Wielowarstwowy szum FBM imitujący nierównomierne zmętnienie soczewki ("brudna szyba")
-            float LensCloudFBM(float2 uv)
             // Wielowarstwowy szum FBM z rotacją każdej oktawy (eliminuje prostopadłe/kwadratowe artefakty)
             float LensCloudFBM(float2 p)
             {
                 float v = 0.0;
-                float amp = 0.5;
-                float2 p = uv * _CloudScale;
-                for (int k = 0; k < 3; k++)
                 float amp = 0.55;
                 float2 pos = p * _CloudScale;
                 const float2x2 rot = float2x2(0.80, -0.60, 0.60, 0.80);
 
                 for (int k = 0; k < 4; k++)
                 {
-                    v += amp * ValueNoise(p);
-                    p = p * 2.03 + float2(1.7, 9.2);
                     v += amp * GradientNoise(pos);
                     pos = mul(rot, pos) * 2.02 + float2(3.17, 7.83);
                     amp *= 0.5;
                 }
-                return v;
                 return saturate(v);
             }
 
@@ -141,15 +122,10 @@ Shader "Ocularis/Defects/Cataract"
                 if (_Intensity <= 0.001)
                     return half4(0, 0, 0, 0);
 
-                // Współrzędne sferyczne per-piksel na wewnętrznej ścianie sfery (brak zniekształceń na brzegach)
                 float3 viewDir = normalize(input.posVS);
-                float2 sphericalAngle = float2(atan2(viewDir.x, -viewDir.z), asin(clamp(viewDir.y, -1.0, 1.0)));
-                float2 uv = sphericalAngle * 0.5 + 0.5;
                 if (viewDir.z > 0.0)
                     return half4(0, 0, 0, 0);
 
-                float clouds = LensCloudFBM(uv);
-                float grain = (Hash21(uv * 950.0) - 0.5) * _FrostScatter * _Intensity;
                 // Gładkie mapowanie kierunku wzroku bez szwów
                 float2 dirCoords = viewDir.xy / (1.0 + abs(viewDir.z));
 
@@ -157,13 +133,10 @@ Shader "Ocularis/Defects/Cataract"
                 float grain = (ScreenSpaceGrain(input.positionHCS.xy) - 0.5) * _FrostScatter * _Intensity;
 
                 // Niejednorodna gęstość zmętnienia + silniejsze zamglenie przy wyższym Intensity
-                float cloudFactor = lerp(1.0, lerp(0.65, 1.35, clouds), _Cloudiness);
-                float alpha = saturate(_Intensity * _HazeColor.a * cloudFactor + grain);
                 float cloudFactor = lerp(1.0, lerp(0.72, 1.28, clouds), _Cloudiness);
                 float alpha = saturate(_Intensity * _HazeColor.a * cloudFactor + grain * 0.5);
 
                 // Lekkie pożółknięcie / wyblaknięcie barwy
-                float3 rgb = saturate(_HazeColor.rgb + grain * 0.6);
                 float3 rgb = saturate(_HazeColor.rgb + (clouds - 0.5) * 0.06 + grain * 0.35);
 
                 return half4(rgb, alpha);

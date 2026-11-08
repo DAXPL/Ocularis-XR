@@ -9,15 +9,11 @@ public class MacularDegenerationDefect : VisionDefectBase
 {
     [Header("Parametry AMD - Mroczek centralny")]
     [SerializeField] private Color scotomaColor = new Color(0.04f, 0.04f, 0.04f, 0.96f);
-    [SerializeField, Range(0.02f, 0.45f)] private float maxScotomaRadius = 0.18f;
-    [SerializeField, Range(0.02f, 0.3f)] private float edgeSoftness = 0.09f;
     [SerializeField, Range(0.04f, 0.35f)] private float maxScotomaRadius = 0.16f;
     [SerializeField, Range(0.02f, 0.25f)] private float edgeSoftness = 0.08f;
 
-    [Header("Parametry AMD - Postać wysiękowa (Falowanie linii)")]
     [Header("Parametry AMD - Postać wysiękowa (Falowanie boków)")]
     [SerializeField] private bool enableWetFormDistortion = true;
-    [SerializeField, Range(0f, 0.08f)] private float waveAmplitude = 0.028f;
     [SerializeField, Range(0f, 0.08f)] private float waveAmplitude = 0.035f;
     [SerializeField, Range(5f, 40f)] private float waveFrequency = 18.0f;
 
