@@ -2,10 +2,11 @@ Shader "Ocularis/Defects/Floaters"
 {
     Properties
     {
-        _Intensity ("Intensity", Range(0, 1)) = 0.0
+        _Intensity ("Intensity (Widocznosc)", Range(0, 1)) = 0.0
+        _Intensity2 ("Intensity2 (Ilosc)", Range(0, 1)) = 0.5
         _FloaterColor ("Kolor Metow", Color) = (0.08, 0.08, 0.09, 0.68)
         _InertiaOffset ("Przesuniecie Bezwladnosci (XY)", Vector) = (0, 0, 0, 0)
-        _Density ("Gestosc i Liczba Metow", Range(0.5, 3.0)) = 1.4
+        _Density ("Gestosc i Liczba Metow", Range(0.2, 4.0)) = 1.4
         _FloaterSize ("Rozmiar Metow", Range(0.3, 2.5)) = 1.0
     }
 
@@ -49,6 +50,7 @@ Shader "Ocularis/Defects/Floaters"
 
             CBUFFER_START(UnityPerMaterial)
                 float _Intensity;
+                float _Intensity2;
                 float4 _FloaterColor;
                 float4 _InertiaOffset;
                 float _Density;
@@ -81,7 +83,7 @@ Shader "Ocularis/Defects/Floaters"
                 float along = dot(rel, dir);
                 float across = dot(rel, perp);
 
-                // ~3x krótsze i drobniejsze nitki kolagenowe
+                // Krótkie i drobne nitki kolagenowe
                 float len = lerp(0.008, 0.026, Hash22(seed + 13.7).y) * _FloaterSize;
                 float clampedAlong = clamp(along, -len, len);
 
@@ -89,7 +91,7 @@ Shader "Ocularis/Defects/Floaters"
                 float wiggle = sin(clampedAlong * 195.0 + seed.x * 10.0 + timePhase * 1.2) * 0.0024 * _FloaterSize;
                 float dist = length(float2(along - clampedAlong, across - wiggle));
 
-                // Charakterystyczny profil dyfrakcyjny mętu (ciemniejszy pierścień + półprzezroczyste wnętrze)
+                // Profil dyfrakcyjny mętu (ciemniejszy pierścień + półprzezroczyste wnętrze)
                 float core = 1.0 - smoothstep(radius * 0.2, radius, dist);
                 float ring = smoothstep(radius * 0.35, radius * 0.7, dist) * (1.0 - smoothstep(radius * 0.7, radius * 1.35, dist));
                 return saturate(core * 0.65 + ring * 0.55);
@@ -140,8 +142,11 @@ Shader "Ocularis/Defects/Floaters"
                 float t = _Time.y;
                 float totalMask = 0.0;
 
+                // Liczba nitek i kropek mętów kontrolowana bezpośrednio przez _Density (suwak intensity2)
+                float densityFactor = saturate(_Density / 2.8);
+
                 // Warstwa 1 (bliżej siatkówki - drobne nitki i wstążki)
-                int wormCount = (int)lerp(4.0, 11.0, _Intensity * saturate(_Density * 0.5));
+                int wormCount = (int)lerp(2.0, 11.0, densityFactor);
                 [loop]
                 for (int w = 0; w < 11; w++)
                 {
@@ -154,7 +159,7 @@ Shader "Ocularis/Defects/Floaters"
                 }
 
                 // Warstwa 2 (głębiej w ciele szklistym - drobne rozmyte kropki/muszki)
-                int dotCount = (int)lerp(5.0, 14.0, _Intensity * saturate(_Density * 0.5));
+                int dotCount = (int)lerp(3.0, 14.0, densityFactor);
                 [loop]
                 for (int d = 0; d < 14; d++)
                 {
@@ -166,7 +171,8 @@ Shader "Ocularis/Defects/Floaters"
                     totalMask += DotFloater(p2, seed, (0.0022 + 0.0010 * (1.0 - depthLayer)) * _FloaterSize, t);
                 }
 
-                float alpha = saturate(totalMask) * saturate(_Intensity * 1.4) * _FloaterColor.a;
+                // Widoczność/wyrazistość kontrolowana przez suwak _Intensity
+                float alpha = saturate(totalMask) * saturate(_Intensity * 1.5) * _FloaterColor.a;
                 return half4(_FloaterColor.rgb, alpha);
             }
             ENDHLSL

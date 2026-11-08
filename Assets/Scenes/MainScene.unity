@@ -31069,8 +31069,8 @@ MonoBehaviour:
   customMaterialTemplate: {fileID: 0}
   sphereDiameter: 1
   mode: 0
-  blurTint: {r: 0.96, g: 0.95, b: 0.93, a: 0.42}
-  maxBlurRadius: 0.022
+  blurTint: {r: 0.97, g: 0.98, b: 1, a: 0.85}
+  maxBlurRadius: 0.035
   myopiaMinDistance: 0.35
   myopiaMaxDistance: 2.5
   hyperopiaMinDistance: 0.25
@@ -31129,8 +31129,8 @@ MonoBehaviour:
   customMaterialTemplate: {fileID: 0}
   sphereDiameter: 1
   mode: 1
-  blurTint: {r: 0.96, g: 0.95, b: 0.93, a: 0.42}
-  maxBlurRadius: 0.022
+  blurTint: {r: 0.97, g: 0.98, b: 1, a: 0.85}
+  maxBlurRadius: 0.035
   myopiaMinDistance: 0.35
   myopiaMaxDistance: 2.5
   hyperopiaMinDistance: 0.25

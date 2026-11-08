@@ -4,13 +4,22 @@ using UnityEngine;
 /// Symulacja Mętów Ciała Szklistego (Vitreous Floaters):
 /// Półprzezroczyste kropki, nitki i wstążki, które poruszają się z bezwładnością
 /// przy ruchach głowy/oczu i powoli dryfują w dół pod wpływem grawitacji.
+/// Parametry:
+/// - intensity: widoczność i wyrazistość mętów (od ledwo widocznych cieni do ciemnych nitek)
+/// - intensity2: liczba i gęstość mętów (od 2-3 nitek do gęstego roju mętów)
 /// </summary>
 public class FloatersDefect : VisionDefectBase
 {
     [Header("Parametry wyglądu mętów")]
     [SerializeField] private Color floaterColor = new Color(0.08f, 0.08f, 0.09f, 0.68f);
-    [SerializeField, Range(0.5f, 3.0f)] private float density = 1.4f;
+    [Tooltip("Rozmiar mętów")]
     [SerializeField, Range(0.5f, 2.5f)] private float floaterSize = 1.0f;
+
+    [Header("Parametry drugiego suwaka (intensity2 -> ilość mętów)")]
+    [Tooltip("Minimalna gęstość przy intensity2 = 0 (kilka pojedynczych mętów)")]
+    [SerializeField, Range(0.2f, 1.2f)] private float minDensity = 0.45f;
+    [Tooltip("Maksymalna gęstość przy intensity2 = 1 (duża liczba nitek i muszek)")]
+    [SerializeField, Range(1.5f, 4.0f)] private float maxDensity = 2.8f;
 
     [Header("Fizyka pływania w ciele szklistym (Bezwładność)")]
     [SerializeField, Range(0.05f, 1.5f)] private float inertiaSensitivity = 0.42f;
@@ -76,12 +85,16 @@ public class FloatersDefect : VisionDefectBase
         RuntimeMaterial.SetVector(InertiaOffsetProp, new Vector4(totalOffset.x, totalOffset.y, 0f, 0f));
     }
 
-    protected override void ApplyDefect(float currentIntensity)
+    protected override void ApplyDefect(float currentIntensity, float currentIntensity2)
     {
         if (RuntimeMaterial == null) return;
 
+        // intensity -> widoczność i wyrazistość mętów (przezroczystość bufora w shaderze: _Intensity)
+        // intensity2 -> gęstość i ilość mętów (Shader: _Density)
+        float calculatedDensity = Mathf.Lerp(minDensity, maxDensity, currentIntensity2);
+
         RuntimeMaterial.SetColor(FloaterColorProp, floaterColor);
-        RuntimeMaterial.SetFloat(DensityProp, density);
+        RuntimeMaterial.SetFloat(DensityProp, calculatedDensity);
         RuntimeMaterial.SetFloat(FloaterSizeProp, floaterSize);
     }
 }

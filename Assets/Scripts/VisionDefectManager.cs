@@ -11,6 +11,10 @@ public class VisionDefectManager : MonoBehaviour
     [Header("Podgląd / Test w Inspectorze (Play Mode)")]
     [SerializeField] private string initialDefectType = "";
     [SerializeField, Range(0f, 1f)] private float currentIntensity = 1.0f;
+    [SerializeField, Range(0f, 1f)] private float currentIntensity2 = 0.5f;
+
+    public float CurrentIntensity => currentIntensity;
+    public float CurrentIntensity2 => currentIntensity2;
 
     private void Awake()
     {
@@ -21,7 +25,7 @@ public class VisionDefectManager : MonoBehaviour
     {
         if (!string.IsNullOrEmpty(initialDefectType))
         {
-            ActivateDefect(initialDefectType, currentIntensity);
+            ActivateDefect(initialDefectType, currentIntensity, currentIntensity2);
         }
     }
 
@@ -46,13 +50,15 @@ public class VisionDefectManager : MonoBehaviour
         }
     }
 
-    public void ActivateDefect(string type, float initialIntensity = 1.0f)
+    public void ActivateDefect(string type, float initialIntensity = 1.0f, float initialIntensity2 = 0.5f)
     {
         currentIntensity = Mathf.Clamp01(initialIntensity);
+        currentIntensity2 = Mathf.Clamp01(initialIntensity2);
 
         if (CurrentDefect != null && CurrentDefect.DefectType == type)
         {
             CurrentDefect.SetIntensity(currentIntensity);
+            CurrentDefect.SetIntensity2(currentIntensity2);
             return;
         }
 
@@ -62,6 +68,7 @@ public class VisionDefectManager : MonoBehaviour
         {
             newDefect.EnableDefect();
             newDefect.SetIntensity(currentIntensity);
+            newDefect.SetIntensity2(currentIntensity2);
             CurrentDefect = newDefect;
             initialDefectType = type;
         }
@@ -74,13 +81,17 @@ public class VisionDefectManager : MonoBehaviour
     /// <summary>
     /// Wygodna metoda typu On/Off pod przyciski UI: jeśli dana wada jest już aktywna, wyłącza ją; w przeciwnym razie włącza.
     /// </summary>
-
-   public void SetEffect(string type)
+    public void SetEffect(string type)
     {
-        ToggleDefect(type, currentIntensity);
+        ToggleDefect(type, currentIntensity, currentIntensity2);
     }
-    
+
     public void ToggleDefect(string type, float initialIntensity = 1.0f)
+    {
+        ToggleDefect(type, initialIntensity, currentIntensity2);
+    }
+
+    public void ToggleDefect(string type, float initialIntensity, float initialIntensity2)
     {
         if (CurrentDefect != null && CurrentDefect.DefectType == type && CurrentDefect.IsActive)
         {
@@ -88,7 +99,7 @@ public class VisionDefectManager : MonoBehaviour
         }
         else
         {
-            ActivateDefect(type, initialIntensity);
+            ActivateDefect(type, initialIntensity, initialIntensity2);
         }
     }
 
@@ -104,13 +115,38 @@ public class VisionDefectManager : MonoBehaviour
         CurrentDefect = null;
     }
 
-    //Przy slidowaniu niektórych wad spada mocno płynność - może warto zrobić jakiś delay żeby aktualizować intensywność co np. 0.1s zamiast przy każdej zmianie suwaka? Albo po tym jak przez 0.1s nie ma żadnej aktywności
+    /// <summary>
+    /// Suwak 1 w UI (np. widoczność mętów, siła rozmycia, zwężenie pola jaskry, wielkość mroczka AMD, zamglenie zaćmy).
+    /// </summary>
     public void UpdateCurrentDefectIntensity(float intensity)
     {
         currentIntensity = Mathf.Clamp01(intensity);
         if (CurrentDefect != null && _defects.TryGetValue(CurrentDefect.DefectType, out var defect))
         {
             defect.SetIntensity(currentIntensity);
+        }
+    }
+
+    /// <summary>
+    /// Suwak 2 w UI (np. liczba/gęstość mętów, odległość ostrości dla wad refrakcji, falowanie boków AMD, miękkość jaskry).
+    /// </summary>
+    public void UpdateCurrentDefectIntensity2(float intensity2)
+    {
+        currentIntensity2 = Mathf.Clamp01(intensity2);
+        if (CurrentDefect != null && _defects.TryGetValue(CurrentDefect.DefectType, out var defect))
+        {
+            defect.SetIntensity2(currentIntensity2);
+        }
+    }
+
+    public void SetIntensities(float intensity, float intensity2)
+    {
+        currentIntensity = Mathf.Clamp01(intensity);
+        currentIntensity2 = Mathf.Clamp01(intensity2);
+        if (CurrentDefect != null && _defects.TryGetValue(CurrentDefect.DefectType, out var defect))
+        {
+            defect.SetIntensity(currentIntensity);
+            defect.SetIntensity2(currentIntensity2);
         }
     }
 
@@ -121,19 +157,10 @@ public class VisionDefectManager : MonoBehaviour
 
     private void OnValidate()
     {
-        if (!Application.isPlaying || _defects.Count == 0) return;
-
-        if (string.IsNullOrEmpty(initialDefectType))
-        {
-            if (CurrentDefect != null) DeactivateAll();
-        }
-        else if (CurrentDefect == null || CurrentDefect.DefectType != initialDefectType)
-        {
-            ActivateDefect(initialDefectType, currentIntensity);
-        }
-        else
+        if (Application.isPlaying && CurrentDefect != null)
         {
             UpdateCurrentDefectIntensity(currentIntensity);
+            UpdateCurrentDefectIntensity2(currentIntensity2);
         }
     }
 }

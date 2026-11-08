@@ -2,12 +2,12 @@ Shader "Ocularis/Defects/DepthBlur"
 {
     Properties
     {
-        _Intensity ("Intensity", Range(0, 1)) = 0.0
+        _Intensity ("Intensity (Glebokosc rozmycia)", Range(0, 1)) = 0.0
+        _Intensity2 ("Intensity2 (Dystans ostrosci)", Range(0, 1)) = 0.5
         [Toggle] _InvertDepth ("Tryb Nadwzrocznosci (1 = Blisko rozmyte, 0 = Daleko rozmyte)", Float) = 0.0
-        _FocusNear ("Poczatek strefy przejscia (m)", Range(0.1, 3.0)) = 0.55
-        _FocusFar ("Koniec strefy przejscia (m)", Range(0.3, 6.0)) = 1.40
-        _BlurTint ("Odcien rozproszenia (Frosted Blur)", Color) = (0.88, 0.90, 0.92, 0.72)
-        _BlurRadius ("Promien rozmycia (Ghosting / Defocus)", Range(0.0, 0.035)) = 0.014
+        _FocusNear ("Poczatek strefy przejscia (m)", Float) = 0.55
+        _FocusFar ("Koniec strefy przejscia (m)", Float) = 1.40
+        _BlurTint ("Odcien dyfuzji soczewkowej (Optical Tint)", Color) = (0.97, 0.98, 1.0, 0.75)
     }
 
     SubShader
@@ -35,7 +35,6 @@ Shader "Ocularis/Defects/DepthBlur"
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
-            // Integracja z Meta XR Environment Depth API (z [BuildingBlock] Occlusion obecnego na scenie)
             TEXTURE2D_X_FLOAT(_EnvironmentDepthTexture);
             SAMPLER(sampler_EnvironmentDepthTexture);
             uniform float4x4 _EnvironmentDepthReprojectionMatrices[2];
@@ -57,38 +56,72 @@ Shader "Ocularis/Defects/DepthBlur"
 
             CBUFFER_START(UnityPerMaterial)
                 float _Intensity;
+                float _Intensity2;
                 float _InvertDepth;
                 float _FocusNear;
                 float _FocusFar;
                 float4 _BlurTint;
-                float _BlurRadius;
             CBUFFER_END
 
-            float Hash21(float2 p)
+            // 9-punktowy filtr Gaussa dla bufora glebi (usuwa wszelka pikseloze i schodki z sensora)
+            static const float2 GAUSS_OFFSETS[9] = {
+                float2( 0.0,  0.0),
+                float2(-1.0,  0.0),
+                float2( 1.0,  0.0),
+                float2( 0.0, -1.0),
+                float2( 0.0,  1.0),
+                float2(-1.0, -1.0),
+                float2( 1.0, -1.0),
+                float2(-1.0,  1.0),
+                float2( 1.0,  1.0)
+            };
+
+            static const float GAUSS_WEIGHTS[9] = {
+                0.2500,
+                0.1250,
+                0.1250,
+                0.1250,
+                0.1250,
+                0.0625,
+                0.0625,
+                0.0625,
+                0.0625
+            };
+
+            float RawEyeDepthToMeters(float rawDepthEye)
             {
-                p = frac(p * float2(123.34, 456.21));
-                p += dot(p, p + 45.32);
-                return frac(p.x * p.y);
+                float inputDepthNdc = rawDepthEye * 2.0 - 1.0;
+                if (inputDepthNdc >= 0.9999) return 10000.0;
+                float denom = inputDepthNdc + _EnvironmentDepthZBufferParams.y;
+                if (abs(denom) < 0.0001) return 10000.0;
+                return max(0.05, (1.0 / denom) * _EnvironmentDepthZBufferParams.x);
             }
 
-            float GetEnvironmentLinearDepth(float3 worldPos)
+            // Pobiera idealnie wygladzona, ciagla glebie ze srodowiska Meta Quest (brak pikselozy)
+            float GetGaussianSmoothDepth(float2 uvCoords)
             {
-                if (abs(_EnvironmentDepthZBufferParams.x) < 0.0001)
-                    return 10000.0;
+                if (abs(_EnvironmentDepthZBufferParams.x) < 0.0001) return 10000.0;
 
-                float4 depthSpace = mul(_EnvironmentDepthReprojectionMatrices[unity_StereoEyeIndex], float4(worldPos, 1.0));
-                float2 uvCoords = (depthSpace.xy / depthSpace.w + 1.0) * 0.5;
-                float inputDepthEye = SAMPLE_TEXTURE2D_X(_EnvironmentDepthTexture, sampler_EnvironmentDepthTexture, uvCoords).r;
-                float inputDepthNdc = inputDepthEye * 2.0 - 1.0;
+                float2 texelSize = float2(1.0 / 320.0, 1.0 / 240.0) * 1.5;
+                float depthAcc = 0.0;
+                float weightAcc = 0.0;
 
-                if (inputDepthNdc >= 0.9999)
-                    return 10000.0;
+                [unroll]
+                for (int i = 0; i < 9; i++)
+                {
+                    float2 tapUV = clamp(uvCoords + GAUSS_OFFSETS[i] * texelSize, 0.001, 0.999);
+                    float rawD = SAMPLE_TEXTURE2D_X(_EnvironmentDepthTexture, sampler_EnvironmentDepthTexture, tapUV).r;
+                    float d = RawEyeDepthToMeters(rawD);
 
-                float denom = inputDepthNdc + _EnvironmentDepthZBufferParams.y;
-                if (abs(denom) < 0.0001)
-                    return 10000.0;
+                    if (d < 9999.0)
+                    {
+                        float w = GAUSS_WEIGHTS[i];
+                        depthAcc += d * w;
+                        weightAcc += w;
+                    }
+                }
 
-                return max(0.05, (1.0 / denom) * _EnvironmentDepthZBufferParams.x);
+                return (weightAcc > 0.01) ? (depthAcc / weightAcc) : 10000.0;
             }
 
             Varyings vert(Attributes input)
@@ -111,33 +144,65 @@ Shader "Ocularis/Defects/DepthBlur"
                 if (_Intensity <= 0.001)
                     return half4(0, 0, 0, 0);
 
-                float3 viewDir = normalize(input.posVS);
-                float2 p = float2(atan2(viewDir.x, -viewDir.z), asin(clamp(viewDir.y, -1.0, 1.0)));
+                // Projekcja promienia wzroku na wspolrzedne bufora glebi
+                float4 depthSpace = mul(_EnvironmentDepthReprojectionMatrices[unity_StereoEyeIndex], float4(input.positionWS, 1.0));
+                float2 uvCoords = (depthSpace.xy / depthSpace.w + 1.0) * 0.5;
 
-                // 1. Głębia rzeczywistego pokoju oraz dłoni z Meta Depth API ([BuildingBlock] Occlusion).
-                //    Nie używamy _CameraDepthTexture ani _CameraOpaqueTexture, ponieważ wymuszają one
-                //    kopiowanie bufora w URP, co nadpisuje kanał alfa = 1.0 i powoduje czarny Passthrough.
-                float distanceMeters = GetEnvironmentLinearDepth(input.positionWS);
+                // Pobranie zfiltrowanej, idealnie gladkiej glebi bez schodkow
+                float smoothDepth = GetGaussianSmoothDepth(saturate(uvCoords));
 
-                // 2. Wyznaczenie stopnia nieostrości (0 = ostro, 1 = pełne rozmycie)
-                float farBlurFactor = smoothstep(_FocusNear, _FocusFar, distanceMeters);
-                float defocusFactor = (_InvertDepth > 0.5) ? (1.0 - farBlurFactor) : farBlurFactor;
-
-                // Gdy Depth API nie zwraca jeszcze danych (np. w edytorze bez gogli), pokaż delikatną demonstrację na obrzeżach
-                if (distanceMeters >= 9999.0 && _InvertDepth > 0.5)
+                #if defined(UNITY_EDITOR)
+                if (abs(_EnvironmentDepthZBufferParams.x) < 0.0001)
                 {
-                    defocusFactor = smoothstep(0.35, 0.05, acos(clamp(-viewDir.z, -1.0, 1.0)));
+                    float3 viewDir = normalize(input.posVS);
+                    if (_InvertDepth > 0.5)
+                        smoothDepth = lerp(0.3, 2.5, saturate(-viewDir.y * 1.5 + 0.5));
+                    else
+                        smoothDepth = lerp(0.4, 3.5, saturate(-viewDir.z * 1.2 + 0.3));
+                }
+                #endif
+
+                float defocus = 0.0;
+                bool isHyperopia = (_InvertDepth > 0.5);
+
+                if (isHyperopia)
+                {
+                    // Nadwzrocznosc: oddal ostra, bliskie obiekty (dlonie) rozmyte
+                    if (smoothDepth >= 9999.0)
+                    {
+                        defocus = 0.0;
+                    }
+                    else if (smoothDepth < _FocusFar)
+                    {
+                        float delta = _FocusFar - smoothDepth;
+                        float sigma = max(0.15, (_FocusFar - _FocusNear) * 0.75);
+                        defocus = 1.0 - exp(-0.5 * (delta * delta) / (sigma * sigma));
+                    }
+                }
+                else
+                {
+                    // Krotkowzrocznosc: blisko ostre, dal rozmyta
+                    if (smoothDepth >= 9999.0)
+                    {
+                        defocus = 1.0;
+                    }
+                    else if (smoothDepth > _FocusNear)
+                    {
+                        float delta = smoothDepth - _FocusNear;
+                        float sigma = max(0.20, (_FocusFar - _FocusNear) * 0.75);
+                        defocus = 1.0 - exp(-0.5 * (delta * delta) / (sigma * sigma));
+                    }
                 }
 
-                float activeBlur = defocusFactor * _Intensity;
-                if (activeBlur <= 0.005)
+                float activeBlur = defocus * _Intensity;
+                if (activeBlur <= 0.001)
                     return half4(0, 0, 0, 0);
 
-                // 3. Matowe rozproszenie soczewkowe (Frosted / Defocus scatter) zachowujące przezroczystość Passthrough
-                float fineGrain = (Hash21(p * 650.0) - 0.5) * 0.10 * activeBlur;
-                float softWave = (sin(p.x * 90.0) * cos(p.y * 90.0)) * _BlurRadius * 1.8 * activeBlur;
+                // Dyskretna mikro-dyfuzja niszczaca ostrosc krawedzi bez widocznego ziarna
+                float microScatter = frac(sin(dot(input.positionHCS.xy, float2(12.9898, 78.233))) * 43758.5453);
+                float subtleScatter = (microScatter - 0.5) * 0.02 * activeBlur;
 
-                float3 finalRGB = saturate(_BlurTint.rgb + fineGrain + softWave);
+                float3 finalRGB = saturate(_BlurTint.rgb + subtleScatter);
                 float finalAlpha = saturate(activeBlur * _BlurTint.a);
 
                 return half4(finalRGB, finalAlpha);

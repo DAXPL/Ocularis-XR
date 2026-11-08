@@ -3,6 +3,7 @@ Shader "Ocularis/Defects/Glaucoma"
     Properties
     {
         _Intensity ("Intensity", Range(0, 1)) = 0.0
+        _Intensity2 ("Intensity2 (Miekkosc)", Range(0, 1)) = 0.5
         _VignetteColor ("Kolor Ubytku Pola", Color) = (0.01, 0.01, 0.01, 1.0)
         _MinRadius ("Min Promien (Widzenie lunetowe przy Intensity=1)", Range(0.08, 0.45)) = 0.26
         _MaxRadius ("Max Promien (Pelne pole przy Intensity=0)", Range(0.5, 1.2)) = 0.85
@@ -50,6 +51,7 @@ Shader "Ocularis/Defects/Glaucoma"
 
             CBUFFER_START(UnityPerMaterial)
                 float _Intensity;
+                float _Intensity2;
                 float4 _VignetteColor;
                 float _MinRadius;
                 float _MaxRadius;

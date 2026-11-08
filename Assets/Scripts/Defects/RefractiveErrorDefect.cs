@@ -3,7 +3,11 @@ using UnityEngine;
 /// <summary>
 /// Symulacja wad refrakcji zależnych od odległości:
 /// - Krótkowzroczność (Myopia): pacjent widzi ostro z bliska, ale obraz w oddali jest zamazany.
-/// - Nadwzroczność (Hyperopia): pacjent widzi ostro w oddali, ale obiekty blisko oczu (np. dłonie, tekst) są zamazane.
+///   intensity -> siła rozmycia (rozmiar dioptrii / blur radius).
+///   intensity2 -> odległość ostrego widzenia (punkt dali wzrokowej: od 0.35m do 2.5m).
+/// - Nadwzroczność (Hyperopia): pacjent widzi ostro w oddali, ale obiekty blisko oczu (dłonie, tekst) są zamazane.
+///   intensity -> siła rozmycia.
+///   intensity2 -> odległość bliży wzrokowej (jak daleko przed oczy sięga rozmycie: od 0.25m do 1.3m).
 /// Wykorzystuje Meta Depth API (_EnvironmentDepthTexture z [BuildingBlock] Occlusion).
 /// </summary>
 public class RefractiveErrorDefect : VisionDefectBase
@@ -17,17 +21,34 @@ public class RefractiveErrorDefect : VisionDefectBase
     [Header("Tryb wady refrakcji")]
     [SerializeField] private RefractionMode mode = RefractionMode.Myopia_Krotkowzrocznosc;
 
-    [Header("Zakres ostrości (w metrach)")]
-    [Tooltip("Początek strefy przejścia między ostrym a rozmytym obrazem (w metrach)")]
-    [SerializeField, Range(0.15f, 2.5f)] private float transitionNearMeters = 0.50f;
-    [Tooltip("Koniec strefy przejścia między ostrym a rozmytym obrazem (w metrach)")]
-    [SerializeField, Range(0.35f, 5.0f)] private float transitionFarMeters = 1.25f;
+    [Header("Parametry rozmycia (intensity -> siła nieostrości)")]
+    [Tooltip("Świetlisty, aksamitny odcień dyfuzji soczewkowej (brak szarego nalotu)")]
+    [SerializeField] private Color blurTint = new Color(0.97f, 0.98f, 1.0f, 0.85f);
+    [Tooltip("Maksymalny promień krążka rozproszenia CoC (Bokeh)")]
+    [SerializeField, Range(0.005f, 0.060f)] private float maxBlurRadius = 0.035f;
 
-    [Header("Parametry rozmycia")]
-    [SerializeField] private Color blurTint = new Color(0.88f, 0.90f, 0.92f, 0.72f);
-    [SerializeField, Range(0f, 0.035f)] private float maxBlurRadius = 0.016f;
+    [Header("Parametry odległości ostrości (intensity2 -> dystans w metrach)")]
+    [Tooltip("Krótkowzroczność: odległość ostrego widzenia przy intensity2 = 1 (silna wada, ostro tylko z bliska)")]
+    [SerializeField] private float myopiaMinDistance = 0.35f;
+    [Tooltip("Krótkowzroczność: odległość ostrego widzenia przy intensity2 = 0 (łagodna wada, ostro do 2.5m)")]
+    [SerializeField] private float myopiaMaxDistance = 2.50f;
 
-    protected override string DefaultShaderName => "Ocularis/Defects/DepthBlur";
+    [Tooltip("Nadwzroczność: odległość rozmycia przy intensity2 = 0 (tylko obiekty tuż przy twarzy)")]
+    [SerializeField] private float hyperopiaMinDistance = 0.25f;
+    [Tooltip("Nadwzroczność: odległość rozmycia przy intensity2 = 1 (rozmyte całe pole zasięgu rąk)")]
+    [SerializeField] private float hyperopiaMaxDistance = 1.30f;
+
+    protected override string DefaultShaderName
+    {
+        get
+        {
+            string dedicatedShader = mode == RefractionMode.Myopia_Krotkowzrocznosc ? "Ocularis/Defects/Myopia" : "Ocularis/Defects/Hyperopia";
+            if (Shader.Find(dedicatedShader) != null)
+                return dedicatedShader;
+            return "Ocularis/Defects/DepthBlur";
+        }
+    }
+
     protected override string DefaultDefectType => mode == RefractionMode.Myopia_Krotkowzrocznosc ? "Krotkowzrocznosc" : "Nadwzrocznosc";
 
     private static readonly int InvertDepthProp = Shader.PropertyToID("_InvertDepth");
@@ -49,18 +70,39 @@ public class RefractiveErrorDefect : VisionDefectBase
         }
     }
 
-    protected override void ApplyDefect(float currentIntensity)
+    protected override void ApplyDefect(float currentIntensity, float currentIntensity2)
     {
         bool isHyperopia = mode == RefractionMode.Hyperopia_Nadwzrocznosc;
 
-        // Shader DepthBlur (korzystający z Meta Depth API dla pokoju oraz dłoni)
+        float focusDistance;
+        float near;
+        float far;
+
+        if (isHyperopia)
+        {
+            // Nadwzroczność: intensity2 reguluje bliż wzrokową
+            focusDistance = Mathf.Lerp(hyperopiaMinDistance, hyperopiaMaxDistance, currentIntensity2);
+            near = focusDistance * 0.70f;
+            far = focusDistance * 1.25f;
+        }
+        else
+        {
+            // Krótkowzroczność: intensity2 reguluje punkt dali wzrokowej
+            focusDistance = Mathf.Lerp(myopiaMaxDistance, myopiaMinDistance, currentIntensity2);
+            near = focusDistance * 0.80f;
+            far = focusDistance * 1.30f;
+        }
+
         if (RuntimeMaterial != null)
         {
-            RuntimeMaterial.SetFloat(InvertDepthProp, isHyperopia ? 1.0f : 0.0f);
-            RuntimeMaterial.SetFloat(FocusNearProp, transitionNearMeters);
-            RuntimeMaterial.SetFloat(FocusFarProp, transitionFarMeters);
+            if (RuntimeMaterial.HasProperty(InvertDepthProp))
+            {
+                RuntimeMaterial.SetFloat(InvertDepthProp, isHyperopia ? 1.0f : 0.0f);
+            }
+            RuntimeMaterial.SetFloat(FocusNearProp, near);
+            RuntimeMaterial.SetFloat(FocusFarProp, far);
             RuntimeMaterial.SetColor(BlurTintProp, blurTint);
-            RuntimeMaterial.SetFloat(BlurRadiusProp, maxBlurRadius);
+            RuntimeMaterial.SetFloat(BlurRadiusProp, Mathf.Lerp(0.008f, maxBlurRadius, currentIntensity));
         }
     }
 }

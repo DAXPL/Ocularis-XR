@@ -2,22 +2,20 @@ using UnityEngine;
 
 /// <summary>
 /// Symulacja Zaćmy (Cataract):
-/// 1. Obniżenie kontrastu i nasycenia barw w OVRPassthroughLayer (świat rzeczywisty).
-/// 2. Nakładka na Quadzie z efektem mleczno-żółtej mgły i "zabrudzonej soczewki" (VisionDefect_Cataract.shader).
-/// Uwaga: Nie używamy URP Post-Processing (Bloom/ColorAdjustments), ponieważ w trybie Underlay Passthrough
-/// przebieg post-processingu URP nadpisuje kanał alfa bufora oka na 1.0, co daje czarny ekran Passthrough.
+/// - intensity: ogólne zmętnienie soczewki, mleczno-żółta mgła oraz spadek kontrastu Passthrough.
+/// - intensity2: stopień niejednorodności zmętnienia ("brudna szyba") oraz rozproszenia światła wokół źródeł (efekt olśnienia).
 /// </summary>
 public class CataractDefect : VisionDefectBase
 {
-    [Header("Parametry Zaćmy - Passthrough")]
+    [Header("Parametry Zaćmy - Passthrough (intensity)")]
     [SerializeField, Range(-1f, 0f)] private float maxContrastReduction = -0.45f;
     [SerializeField, Range(-1f, 0f)] private float maxSaturationReduction = -0.55f;
     [SerializeField, Range(-0.5f, 0.5f)] private float maxBrightnessShift = -0.05f;
 
-    [Header("Parametry Zaćmy - Nakładka (Mgła i Brudna Szyba)")]
+    [Header("Parametry Zaćmy - Nakładka (intensity2 -> niejednorodność i rozproszenie światła)")]
     [SerializeField] private Color hazeColor = new Color(0.95f, 0.89f, 0.72f, 0.78f);
-    [SerializeField, Range(0f, 1f)] private float cloudiness = 0.5f;
-    [SerializeField, Range(0f, 0.25f)] private float frostScatter = 0.09f;
+    [SerializeField, Range(0.1f, 1f)] private float maxCloudiness = 0.75f;
+    [SerializeField, Range(0.02f, 0.25f)] private float maxFrostScatter = 0.14f;
 
     protected override string DefaultShaderName => "Ocularis/Defects/Cataract";
     protected override string DefaultDefectType => "Zacma";
@@ -39,7 +37,7 @@ public class CataractDefect : VisionDefectBase
         }
     }
 
-    protected override void ApplyDefect(float currentIntensity)
+    protected override void ApplyDefect(float currentIntensity, float currentIntensity2)
     {
         // 1. Passthrough: mniejszy kontrast i wyblakłe kolory świata rzeczywistego
         if (passthroughLayer != null)
@@ -51,12 +49,15 @@ public class CataractDefect : VisionDefectBase
             );
         }
 
-        // 2. Shader nakładki: mleczno-żółta mgła i zmętnienie soczewki
+        // 2. Shader nakładki: zmętnienie soczewki (intensity2 reguluje plamistość i rozproszenie światła)
         if (RuntimeMaterial != null)
         {
+            float activeCloudiness = Mathf.Lerp(0.15f, maxCloudiness, currentIntensity2);
+            float activeScatter = Mathf.Lerp(0.01f, maxFrostScatter, currentIntensity2);
+
             RuntimeMaterial.SetColor(HazeColorProp, hazeColor);
-            RuntimeMaterial.SetFloat(CloudinessProp, cloudiness);
-            RuntimeMaterial.SetFloat(FrostScatterProp, frostScatter);
+            RuntimeMaterial.SetFloat(CloudinessProp, activeCloudiness);
+            RuntimeMaterial.SetFloat(FrostScatterProp, activeScatter);
         }
     }
 }

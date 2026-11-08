@@ -106,6 +106,19 @@ public class ConfigurableVisionDefect : MonoBehaviour, IVisionDefect
         }
     }
 
+    public void SetIntensity2(float intensity2)
+    {
+        if (!IsActive) return;
+
+        if (overlayQuadRenderer != null && defectOverlayMaterial != null)
+        {
+            if (defectOverlayMaterial.HasProperty("_Intensity2"))
+            {
+                defectOverlayMaterial.SetFloat("_Intensity2", intensity2);
+            }
+        }
+    }
+
     private void OnDestroy()
     {
         _passthroughLut?.Dispose();

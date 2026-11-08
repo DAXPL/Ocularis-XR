@@ -3,6 +3,7 @@ Shader "Ocularis/Defects/Cataract"
     Properties
     {
         _Intensity ("Intensity", Range(0, 1)) = 0.0
+        _Intensity2 ("Intensity2 (Niejednorodnosc)", Range(0, 1)) = 0.5
         _HazeColor ("Kolor Mgly (Mleczno-zolty)", Color) = (0.95, 0.89, 0.72, 0.78)
         _Cloudiness ("Niejednorodnosc (Brudna szyba)", Range(0, 1)) = 0.45
         _FrostScatter ("Rozproszenie swiatla (Ziarno)", Range(0, 0.25)) = 0.08
@@ -49,6 +50,7 @@ Shader "Ocularis/Defects/Cataract"
 
             CBUFFER_START(UnityPerMaterial)
                 float _Intensity;
+                float _Intensity2;
                 float4 _HazeColor;
                 float _Cloudiness;
                 float _FrostScatter;

@@ -8,4 +8,5 @@ public interface IVisionDefect
     public void EnableDefect();
     public void DisableDefect();
     public void SetIntensity(float intensity);
+    public void SetIntensity2(float intensity2);
 }

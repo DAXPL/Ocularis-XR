@@ -4,12 +4,16 @@ using UnityEngine.Rendering;
 /// <summary>
 /// Klasa bazowa dla pojedynczej wady wzroku działającej w architekturze "On/Off" (osobny GameObject na wadę).
 /// Umieść obiekt z klasą pochodną jako dziecko CenterEyeAnchor (wewnątrz hierarchii VisionDefectManager).
+/// Obsługuje dwa parametry kontrolne:
+/// - intensity: podstawowa intensywność / wyrazistość wady (0..1)
+/// - intensity2: drugi wymiar efektu (np. odległość ostrości dla wad refrakcji, liczba mętów dla floaters itp.)
 /// </summary>
 public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
 {
     [Header("Identyfikacja i intensywność")]
     [SerializeField] protected string defectType = "Defect";
     [SerializeField, Range(0f, 1f)] protected float intensity = 1.0f;
+    [SerializeField, Range(0f, 1f)] protected float intensity2 = 0.5f;
 
     [Header("Referencje wspólne (automatycznie wykrywane jeśli puste)")]
     [SerializeField] protected OVRPassthroughLayer passthroughLayer;
@@ -29,8 +33,11 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
 
     public string DefectType => (string.IsNullOrEmpty(defectType) || defectType == "Defect") ? DefaultDefectType : defectType;
     public bool IsActive { get; private set; }
+    public float Intensity => intensity;
+    public float Intensity2 => intensity2;
 
     protected static readonly int IntensityPropId = Shader.PropertyToID("_Intensity");
+    protected static readonly int Intensity2PropId = Shader.PropertyToID("_Intensity2");
 
     protected virtual void Awake()
     {
@@ -68,7 +75,6 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
             return;
         }
 
-        // Usuń ewentualny stary OverlayQuad z poprzedniej wersji
         Transform legacyQuad = transform.Find("OverlayQuad");
         if (legacyQuad != null)
         {
@@ -145,7 +151,7 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
         }
 
         OnDefectEnabled();
-        SetIntensity(intensity);
+        SetIntensities(intensity, intensity2);
     }
 
     public virtual void DisableDefect()
@@ -170,15 +176,44 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
     public virtual void SetIntensity(float newIntensity)
     {
         intensity = Mathf.Clamp01(newIntensity);
-
         if (!IsActive) return;
 
-        if (RuntimeMaterial != null && RuntimeMaterial.HasProperty(IntensityPropId))
-        {
-            RuntimeMaterial.SetFloat(IntensityPropId, intensity);
-        }
+        UpdateShaderIntensityProperties();
+        ApplyDefect(intensity, intensity2);
+    }
 
-        ApplyDefect(intensity);
+    public virtual void SetIntensity2(float newIntensity2)
+    {
+        intensity2 = Mathf.Clamp01(newIntensity2);
+        if (!IsActive) return;
+
+        UpdateShaderIntensityProperties();
+        ApplyDefect(intensity, intensity2);
+    }
+
+    public virtual void SetIntensities(float newIntensity, float newIntensity2)
+    {
+        intensity = Mathf.Clamp01(newIntensity);
+        intensity2 = Mathf.Clamp01(newIntensity2);
+        if (!IsActive) return;
+
+        UpdateShaderIntensityProperties();
+        ApplyDefect(intensity, intensity2);
+    }
+
+    protected virtual void UpdateShaderIntensityProperties()
+    {
+        if (RuntimeMaterial != null)
+        {
+            if (RuntimeMaterial.HasProperty(IntensityPropId))
+            {
+                RuntimeMaterial.SetFloat(IntensityPropId, intensity);
+            }
+            if (RuntimeMaterial.HasProperty(Intensity2PropId))
+            {
+                RuntimeMaterial.SetFloat(Intensity2PropId, intensity2);
+            }
+        }
     }
 
     /// <summary>
@@ -194,31 +229,31 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
         }
     }
 
-    /// <summary>
-    /// Wywoływane raz w Awake po przygotowaniu referencji i Quada.
-    /// </summary>
     protected virtual void InitializeDefect() { }
-
-    /// <summary>
-    /// Wywoływane przy włączeniu wady (EnableDefect).
-    /// </summary>
     protected virtual void OnDefectEnabled() { }
-
-    /// <summary>
-    /// Wywoływane przy wyłączeniu wady (DisableDefect) w celu wyczyszczenia np. efektów Volume.
-    /// </summary>
     protected virtual void OnDefectDisabled() { }
 
     /// <summary>
-    /// Główna metoda aktualizująca parametry shadera, Passthrough i Volume na podstawie suwaka (0..1).
+    /// Domyślne wywołanie dla klas pochodnych implementujących tylko jedno intensity.
     /// </summary>
-    protected abstract void ApplyDefect(float currentIntensity);
+    protected virtual void ApplyDefect(float currentIntensity) { }
+
+    /// <summary>
+    /// Główna metoda aktualizująca parametry wady na podstawie obu suwaków:
+    /// - currentIntensity (0..1)
+    /// - currentIntensity2 (0..1)
+    /// Domyślnie deleguje do jednoparametrowego ApplyDefect(currentIntensity).
+    /// </summary>
+    protected virtual void ApplyDefect(float currentIntensity, float currentIntensity2)
+    {
+        ApplyDefect(currentIntensity);
+    }
 
     protected virtual void OnValidate()
     {
         if (Application.isPlaying && IsActive)
         {
-            SetIntensity(intensity);
+            SetIntensities(intensity, intensity2);
         }
     }
 

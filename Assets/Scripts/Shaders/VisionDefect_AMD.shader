@@ -3,6 +3,7 @@ Shader "Ocularis/Defects/AMD"
     Properties
     {
         _Intensity ("Intensity", Range(0, 1)) = 0.0
+        _Intensity2 ("Intensity2 (Falowanie bokow)", Range(0, 1)) = 0.5
         _ScotomaColor ("Kolor Mroczka Centralnego", Color) = (0.04, 0.04, 0.04, 0.96)
         _MaxRadius ("Max Promien Plamy Centralnej", Range(0.04, 0.35)) = 0.16
         _Softness ("Miekkosc Brzegu Plamy", Range(0.02, 0.25)) = 0.08
@@ -50,6 +51,7 @@ Shader "Ocularis/Defects/AMD"
 
             CBUFFER_START(UnityPerMaterial)
                 float _Intensity;
+                float _Intensity2;
                 float4 _ScotomaColor;
                 float _MaxRadius;
                 float _Softness;
