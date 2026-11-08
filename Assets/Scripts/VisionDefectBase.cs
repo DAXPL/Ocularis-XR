@@ -14,13 +14,13 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
     [Header("Referencje wspólne (automatycznie wykrywane jeśli puste)")]
     [SerializeField] protected OVRPassthroughLayer passthroughLayer;
     [SerializeField] protected Volume globalVolume;
-    [SerializeField] protected MeshRenderer overlayQuadRenderer;
+    [SerializeField] protected MeshRenderer overlaySphereRenderer;
 
-    [Header("Konfiguracja Quada nakładki (przed kamerą)")]
+    [Header("Konfiguracja Sfery nakładki (wokół głowy)")]
     [SerializeField] protected Shader defectShader;
     [SerializeField] protected Material customMaterialTemplate;
-    [SerializeField] protected float quadDistance = 0.12f;
-    [SerializeField] protected float quadSize = 0.65f;
+    [Tooltip("Średnica sfery otaczającej głowę (w metrach). Wartość 1.0 oznacza promień 0.5m wokół oczu (powyżej nearClipPlane 0.1m).")]
+    [SerializeField, Range(0.4f, 3.0f)] protected float sphereDiameter = 1.0f;
 
     protected Material RuntimeMaterial { get; private set; }
     protected VolumeProfile RuntimeVolumeProfile => globalVolume != null ? globalVolume.profile : null;
@@ -35,7 +35,7 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
     protected virtual void Awake()
     {
         ResolveReferences();
-        EnsureOverlayQuad();
+        EnsureOverlaySphere();
         InitializeDefect();
     }
 
@@ -53,52 +53,62 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
     }
 
     /// <summary>
-    /// Tworzy lub konfiguruje lekki Quad przed kamerą dla danej wady, jeśli wada korzysta z shadera/materiału.
+    /// Tworzy lub konfiguruje odwróconą Sferę (renderowaną od wewnątrz dzięki Cull Front w shaderze)
+    /// otaczającą głowę użytkownika w pełnych 360 stopniach bez widocznych krawędzi.
     /// </summary>
-    protected virtual void EnsureOverlayQuad()
+    protected virtual void EnsureOverlaySphere()
     {
         if (defectShader == null && !string.IsNullOrEmpty(DefaultShaderName))
         {
             defectShader = Shader.Find(DefaultShaderName);
         }
 
-        if (customMaterialTemplate == null && defectShader == null && overlayQuadRenderer == null)
+        if (customMaterialTemplate == null && defectShader == null && overlaySphereRenderer == null)
         {
             return;
         }
 
-        if (overlayQuadRenderer == null)
+        // Usuń ewentualny stary OverlayQuad z poprzedniej wersji
+        Transform legacyQuad = transform.Find("OverlayQuad");
+        if (legacyQuad != null)
         {
-            Transform existingQuad = transform.Find("OverlayQuad");
-            if (existingQuad != null)
+            if (Application.isPlaying) Destroy(legacyQuad.gameObject);
+            else DestroyImmediate(legacyQuad.gameObject);
+        }
+
+        if (overlaySphereRenderer == null)
+        {
+            Transform existingSphere = transform.Find("OverlaySphere");
+            if (existingSphere != null)
             {
-                overlayQuadRenderer = existingQuad.GetComponent<MeshRenderer>();
+                overlaySphereRenderer = existingSphere.GetComponent<MeshRenderer>();
             }
         }
 
-        if (overlayQuadRenderer == null)
+        if (overlaySphereRenderer == null)
         {
-            GameObject quadObj = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            quadObj.name = "OverlayQuad";
-            quadObj.transform.SetParent(transform, false);
+            GameObject sphereObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            sphereObj.name = "OverlaySphere";
+            sphereObj.transform.SetParent(transform, false);
 
-            Collider col = quadObj.GetComponent<Collider>();
+            Collider col = sphereObj.GetComponent<Collider>();
             if (col != null)
             {
                 if (Application.isPlaying) Destroy(col);
                 else DestroyImmediate(col);
             }
 
-            overlayQuadRenderer = quadObj.GetComponent<MeshRenderer>();
+            overlaySphereRenderer = sphereObj.GetComponent<MeshRenderer>();
         }
 
-        overlayQuadRenderer.transform.localPosition = new Vector3(0f, 0f, quadDistance);
-        overlayQuadRenderer.transform.localRotation = Quaternion.identity;
-        overlayQuadRenderer.transform.localScale = new Vector3(quadSize, quadSize, 1f);
-        overlayQuadRenderer.shadowCastingMode = ShadowCastingMode.Off;
-        overlayQuadRenderer.receiveShadows = false;
-        overlayQuadRenderer.lightProbeUsage = LightProbeUsage.Off;
-        overlayQuadRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
+        float safeDiameter = sphereDiameter > 0.25f ? sphereDiameter : 1.0f;
+        overlaySphereRenderer.transform.localPosition = Vector3.zero;
+        overlaySphereRenderer.transform.localRotation = Quaternion.identity;
+        overlaySphereRenderer.transform.localScale = new Vector3(safeDiameter, safeDiameter, safeDiameter);
+        overlaySphereRenderer.shadowCastingMode = ShadowCastingMode.Off;
+        overlaySphereRenderer.receiveShadows = false;
+        overlaySphereRenderer.lightProbeUsage = LightProbeUsage.Off;
+        overlaySphereRenderer.reflectionProbeUsage = ReflectionProbeUsage.Off;
 
         if (customMaterialTemplate != null)
         {
@@ -108,14 +118,14 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
         {
             RuntimeMaterial = new Material(defectShader);
         }
-        else if (overlayQuadRenderer.sharedMaterial != null)
+        else if (overlaySphereRenderer.sharedMaterial != null)
         {
-            RuntimeMaterial = new Material(overlayQuadRenderer.sharedMaterial);
+            RuntimeMaterial = new Material(overlaySphereRenderer.sharedMaterial);
         }
 
         if (RuntimeMaterial != null)
         {
-            overlayQuadRenderer.sharedMaterial = RuntimeMaterial;
+            overlaySphereRenderer.sharedMaterial = RuntimeMaterial;
         }
     }
 
@@ -125,13 +135,13 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
         IsActive = true;
         gameObject.SetActive(true);
 
-        if (overlayQuadRenderer != null)
+        if (overlaySphereRenderer != null)
         {
             if (RuntimeMaterial == null)
             {
-                EnsureOverlayQuad();
+                EnsureOverlaySphere();
             }
-            overlayQuadRenderer.enabled = true;
+            overlaySphereRenderer.enabled = true;
         }
 
         OnDefectEnabled();
@@ -143,9 +153,9 @@ public abstract class VisionDefectBase : MonoBehaviour, IVisionDefect
         bool wasActive = IsActive;
         IsActive = false;
 
-        if (overlayQuadRenderer != null)
+        if (overlaySphereRenderer != null)
         {
-            overlayQuadRenderer.enabled = false;
+            overlaySphereRenderer.enabled = false;
         }
 
         if (wasActive)

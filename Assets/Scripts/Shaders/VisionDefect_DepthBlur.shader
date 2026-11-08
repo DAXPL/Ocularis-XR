@@ -23,7 +23,7 @@ Shader "Ocularis/Defects/DepthBlur"
         Pass
         {
             Name "DepthBlurOverlay"
-            Cull Off
+            Cull Front
             ZWrite Off
             ZTest Always
             Blend SrcAlpha OneMinusSrcAlpha, One OneMinusSrcAlpha
@@ -51,7 +51,7 @@ Shader "Ocularis/Defects/DepthBlur"
             {
                 float4 positionHCS : SV_POSITION;
                 float3 positionWS : TEXCOORD0;
-                float2 viewAngle : TEXCOORD1;
+                float3 posVS : TEXCOORD1;
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -98,11 +98,9 @@ Shader "Ocularis/Defects/DepthBlur"
                 UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(output);
 
                 float3 posWS = TransformObjectToWorld(input.positionOS.xyz);
-                float3 posVS = TransformWorldToView(posWS);
-
                 output.positionHCS = TransformWorldToHClip(posWS);
                 output.positionWS = posWS;
-                output.viewAngle = posVS.xy / max(0.001, -posVS.z);
+                output.posVS = TransformWorldToView(posWS);
                 return output;
             }
 
@@ -112,6 +110,9 @@ Shader "Ocularis/Defects/DepthBlur"
 
                 if (_Intensity <= 0.001)
                     return half4(0, 0, 0, 0);
+
+                float3 viewDir = normalize(input.posVS);
+                float2 p = float2(atan2(viewDir.x, -viewDir.z), asin(clamp(viewDir.y, -1.0, 1.0)));
 
                 // 1. Głębia rzeczywistego pokoju oraz dłoni z Meta Depth API ([BuildingBlock] Occlusion).
                 //    Nie używamy _CameraDepthTexture ani _CameraOpaqueTexture, ponieważ wymuszają one
@@ -125,7 +126,7 @@ Shader "Ocularis/Defects/DepthBlur"
                 // Gdy Depth API nie zwraca jeszcze danych (np. w edytorze bez gogli), pokaż delikatną demonstrację na obrzeżach
                 if (distanceMeters >= 9999.0 && _InvertDepth > 0.5)
                 {
-                    defocusFactor = smoothstep(0.35, 0.05, length(input.viewAngle));
+                    defocusFactor = smoothstep(0.35, 0.05, acos(clamp(-viewDir.z, -1.0, 1.0)));
                 }
 
                 float activeBlur = defocusFactor * _Intensity;
@@ -133,7 +134,6 @@ Shader "Ocularis/Defects/DepthBlur"
                     return half4(0, 0, 0, 0);
 
                 // 3. Matowe rozproszenie soczewkowe (Frosted / Defocus scatter) zachowujące przezroczystość Passthrough
-                float2 p = input.viewAngle;
                 float fineGrain = (Hash21(p * 650.0) - 0.5) * 0.10 * activeBlur;
                 float softWave = (sin(p.x * 90.0) * cos(p.y * 90.0)) * _BlurRadius * 1.8 * activeBlur;
 

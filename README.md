@@ -41,9 +41,9 @@ System został zaprojektowany w oparciu o **modularną architekturę obiektów t
 1. **Osobny `GameObject` na każdą wadę (Wzorzec On/Off):**
    - Każda wada wzroku jest niezależnym obiektem w hierarchii podpiętym pod `CenterEyeAnchor`.
    - Włączenie wady aktywuje jej `GameObject` (`SetActive(true)`), natomiast wyłączenie dezaktywuje go (`SetActive(false)`) i automatycznie przywraca domyślne ustawienia współdzielonych komponentów (`OVRPassthroughLayer`, `Global Volume`).
-2. **Korekcja stereoskopowa per-oko (Brak efektu zeza na nakładkach):**
-   - Zamiast płaskiego `Canvas` UI, każda wada korzysta z lekkiego mesha `OverlayQuad` umieszczonego przed kamerą (`z = 0.12m`).
-   - Dedykowane shadery URP obliczają współrzędne kątowe bezpośrednio w przestrzeni widoku aktualnie renderowanego oka (`TransformWorldToView` + `UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX`), dzięki czemu środek wady (np. tunel w jaskrze lub mroczek centralny w AMD) pokrywa się idealnie z osią optyczną **lewego i prawego oka niezależnie**.
+2. **Odwrócona Sfera 360° (`OverlaySphere` + `Cull Front`) i korekcja stereoskopowa per-oko:**
+   - Zamiast płaskiego `Canvas` UI lub płaskiego `Quada` (na którym widać prostokątne brzegi i zniekształcenie narożników), każda wada tworzy wokół głowy użytkownika **odwróconą sferę (`OverlaySphere`, średnica `1.0m`)** renderowaną od wewnątrz (`Cull Front`).
+   - Dedykowane shadery URP obliczają współrzędne sferyczne (`atan2` / `acos`) per-piksel bezpośrednio w przestrzeni widoku aktualnie renderowanego oka (`TransformWorldToView` + `UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX`), dzięki czemu środek wady (np. tunel w jaskrze lub mroczek centralny w AMD) pokrywa się idealnie z osią optyczną **lewego i prawego oka niezależnie** w pełnych 360°.
 3. **Trzy współpracujące warstwy efektów (kompatybilne z kanałem Alpha Passthrough):**
    - **`OVRPassthroughLayer` (Sprzętowy Passthrough):** regulacja kontrastu, jasności, nasycenia barw, obrysów krawędzi i tablic kolorów LUT bezpośrednio na strumieniu z kamer gogli.
    - **Meta Environment Depth API (`_EnvironmentDepthTexture`):** odczyt rzeczywistej odległości w metrach do obiektów w pokoju oraz dłoni użytkownika (wykorzystywany w krótkowzroczności i nadwzroczności).
@@ -57,7 +57,7 @@ System został zaprojektowany w oparciu o **modularną architekturę obiektów t
 | Skrypt | Rola w systemie |
 | :--- | :--- |
 | [`IVisionDefect.cs`](Assets/Scripts/IVisionDefect.cs) | Interfejs pojedynczej wady wzroku (`DefectType`, `IsActive`, `EnableDefect()`, `DisableDefect()`, `SetIntensity(float)`). |
-| [`VisionDefectBase.cs`](Assets/Scripts/VisionDefectBase.cs) | Abstrakcyjna klasa bazowa obsługująca cykl życia obiektu On/Off, automatyczne tworzenie `OverlayQuad`, instancjonowanie materiału oraz resetowanie `OVRPassthroughLayer` i `Volume`. |
+| [`VisionDefectBase.cs`](Assets/Scripts/VisionDefectBase.cs) | Abstrakcyjna klasa bazowa obsługująca cykl życia obiektu On/Off, automatyczne tworzenie odwróconej sfery `OverlaySphere`, instancjonowanie materiału oraz resetowanie `OVRPassthroughLayer`. |
 | [`VisionDefectManager.cs`](Assets/Scripts/VisionDefectManager.cs) | Menedżer główny (na `[BuildingBlock] Camera Rig`). Automatycznie wykrywa wszystkie wady w hierarchii dzieci i udostępnia API dla UI oraz podgląd na żywo w Inspectorze. |
 
 #### Przykład użycia z poziomu kodu / UI

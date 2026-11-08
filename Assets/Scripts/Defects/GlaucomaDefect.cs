@@ -9,11 +9,16 @@ using UnityEngine;
 public class GlaucomaDefect : VisionDefectBase
 {
     [Header("Parametry Jaskry (Ubytek obwodowy)")]
+    [Header("Parametry Jaskry (Ubytek obwodowy - winieta)")]
     [SerializeField] private Color vignetteColor = new Color(0.01f, 0.01f, 0.01f, 1.0f);
     [SerializeField, Range(0.02f, 0.35f)] private float minTunnelRadius = 0.055f;
     [SerializeField, Range(0.4f, 1.2f)] private float maxOpenRadius = 0.82f;
     [SerializeField, Range(0.02f, 0.4f)] private float edgeSoftness = 0.14f;
     [SerializeField, Range(0f, 0.15f)] private float edgeIrregularity = 0.045f;
+    [SerializeField, Range(0.08f, 0.45f)] private float minTunnelRadius = 0.26f;
+    [SerializeField, Range(0.5f, 1.2f)] private float maxOpenRadius = 0.85f;
+    [SerializeField, Range(0.05f, 0.45f)] private float edgeSoftness = 0.22f;
+    [SerializeField, Range(0f, 0.08f)] private float edgeIrregularity = 0.015f;
 
     protected override string DefaultShaderName => "Ocularis/Defects/Glaucoma";
     protected override string DefaultDefectType => "Jaskra";

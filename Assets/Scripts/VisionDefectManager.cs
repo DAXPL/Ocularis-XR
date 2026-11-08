@@ -77,7 +77,7 @@ public class VisionDefectManager : MonoBehaviour
 
    public void SetEffect(string type)
     {
-        ToggleDefect(type);
+        ToggleDefect(type, currentIntensity);
     }
     
     public void ToggleDefect(string type, float initialIntensity = 1.0f)
@@ -104,6 +104,7 @@ public class VisionDefectManager : MonoBehaviour
         CurrentDefect = null;
     }
 
+    //Przy slidowaniu niektórych wad spada mocno płynność - może warto zrobić jakiś delay żeby aktualizować intensywność co np. 0.1s zamiast przy każdej zmianie suwaka? Albo po tym jak przez 0.1s nie ma żadnej aktywności
     public void UpdateCurrentDefectIntensity(float intensity)
     {
         currentIntensity = Mathf.Clamp01(intensity);
